@@ -25,6 +25,7 @@ void FinishLineProcessor::prepareToPlay (double sampleRate, int)
     currentSampleRate = sampleRate;
     engine.prepare (sampleRate);
     heldSynthNote = heldTapeNote = -1;
+    keyState.reset();
 }
 
 bool FinishLineProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
@@ -109,6 +110,9 @@ void FinishLineProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::
     buffer.clear();
     if (buffer.getNumChannels() < 2 || n == 0)
         return;
+
+    // Merge clicks on the on-screen keyboard into the MIDI stream (and show incoming notes on it).
+    keyState.processNextMidiBuffer (midi, 0, n, true);
 
     float p[P::NumParams];
     buildSnapshot (p);

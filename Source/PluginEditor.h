@@ -9,7 +9,7 @@ class FinishLineEditor : public juce::AudioProcessorEditor,
                          private juce::Timer
 {
 public:
-    static constexpr int kW = 1240, kH = 780;
+    static constexpr int kW = 1240, kH = 880;
 
     explicit FinishLineEditor (FinishLineProcessor&);
     ~FinishLineEditor() override;
@@ -29,6 +29,7 @@ private:
     void buildMaster();
     void buildLayers();
     void buildFx();
+    void buildKeyboard();
     void refreshPresetBox();
     void stepPreset (int delta);
 

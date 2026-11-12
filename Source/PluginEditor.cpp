@@ -263,7 +263,7 @@ public:
         g.setColour (col::screen);
         g.fillRoundedRectangle (r, 6.0f);
 
-        const auto area = r.reduced (12.0f, 26.0f);
+        const auto area = r.reduced (12.0f, 14.0f).withTrimmedTop (14.0f);
 
         // grid
         g.setColour (col::amber.withAlpha (0.10f));
@@ -320,11 +320,6 @@ public:
         g.setFont (mono (12.0f));
         g.setColour (playing ? col::teal : col::amber);
         g.drawText (status, getWidth() - 274, 6, 260, 16, juce::Justification::centredRight, false);
-
-        g.setFont (mono (10.0f));
-        g.setColour (col::amber.withAlpha (0.65f));
-        g.drawText ("MIDI  C1 ALL  D1 SUB  E1 IMPACT  F1 SYNTH  G1 RISER  A1 TAPE-STOP  C2+ CHROMATIC",
-                    14, getHeight() - 21, getWidth() - 28, 14, juce::Justification::centredLeft, false);
 
         scanlines (g, r, 0.2f);
         g.setColour (col::line);
@@ -396,6 +391,99 @@ private:
     bool dragging = false;
 };
 
+//==============================================================================
+// Trigger keyboard: every key is tinted with the colour of the block it fires.
+struct KeyRole { juce::Colour colour; const char* label; bool active; };
+
+KeyRole keyRole (int note)
+{
+    switch (note)
+    {
+        case 36: return { col::cream, "ALL", true };
+        case 38: return { col::orange, "SUB", true };
+        case 40: return { col::amber, "IMP", true };
+        case 41: return { col::teal, "SYN", true };
+        case 43: return { col::pink, "RIS", true };
+        case 45: return { col::red, "STOP", true };
+        default: break;
+    }
+
+    if (note >= 48)
+        return { juce::MidiMessage::isMidiNoteBlack (note) ? juce::Colour (0xff1b1a1e) : juce::Colour (0xffcbc4b1),
+                 note == 60 ? "ROOT" : "", true };
+
+    return { juce::MidiMessage::isMidiNoteBlack (note) ? juce::Colour (0xff232227) : juce::Colour (0xff3a3940), "", false };
+}
+
+class TriggerKeyboard : public juce::MidiKeyboardComponent
+{
+public:
+    explicit TriggerKeyboard (juce::MidiKeyboardState& state)
+        : juce::MidiKeyboardComponent (state, juce::MidiKeyboardComponent::horizontalKeyboard)
+    {
+        setAvailableRange (36, 96);
+        setLowestVisibleKey (36);
+        setKeyWidth ((float) (FinishLineEditor::kW - 24) / 36.0f);
+        setScrollButtonsVisible (false);
+        setBlackNoteLengthProportion (0.6f);
+        setVelocity (1.0f, false);
+        setMidiChannel (1);
+        setWantsKeyboardFocus (false);
+        setColour (juce::MidiKeyboardComponent::shadowColourId, juce::Colours::transparentBlack);
+    }
+
+    void drawWhiteNote (int note, juce::Graphics& g, juce::Rectangle<float> area, bool isDown, bool isOver,
+                        juce::Colour, juce::Colour) override
+    {
+        const auto role = keyRole (note);
+        auto c = role.colour;
+        if (isDown) c = role.active ? c.interpolatedWith (juce::Colours::white, 0.55f) : c.brighter (0.2f);
+        else if (isOver && role.active) c = c.brighter (0.25f);
+
+        const auto key = area.reduced (0.75f, 0.0f).withTrimmedBottom (isDown ? 0.0f : 2.0f);
+        g.setColour (c);
+        g.fillRoundedRectangle (key, 2.5f);
+        g.fillRect (key.withHeight (4.0f));
+
+        if (! isDown)
+        {
+            g.setColour (juce::Colours::black.withAlpha (0.28f));
+            g.fillRect (key.withTop (key.getBottom() - 5.0f).reduced (1.0f, 0.0f));
+        }
+
+        juce::String text (role.label);
+        if (note >= 48 && note % 12 == 0 && note != 60)
+            text = "C" + juce::String (note / 12 - 2);
+
+        if (text.isNotEmpty())
+        {
+            g.setFont (font (10.0f));
+            g.setColour (col::ink.withAlpha (role.label[0] != 0 ? 1.0f : 0.6f));
+            g.drawText (text, key.withTrimmedBottom (8.0f).toNearestInt(), juce::Justification::centredBottom, false);
+        }
+    }
+
+    void drawBlackNote (int note, juce::Graphics& g, juce::Rectangle<float> area, bool isDown, bool isOver, juce::Colour) override
+    {
+        const auto role = keyRole (note);
+        auto c = role.colour;
+        if (isDown) c = role.active ? col::amber : c.brighter (0.15f);
+        else if (isOver && role.active) c = c.brighter (0.35f);
+
+        g.setColour (col::bg);
+        g.fillRect (area.expanded (1.0f, 0.0f).withTrimmedBottom (-1.0f));
+        g.setColour (c);
+        g.fillRoundedRectangle (area.withTrimmedBottom (isDown ? 0.0f : 2.0f), 2.0f);
+        g.fillRect (area.withHeight (4.0f));
+
+        if (role.active && ! isDown)
+        {
+            g.setColour (juce::Colours::white.withAlpha (0.08f));
+            g.fillRect (area.reduced (2.5f, 0.0f).withTrimmedBottom (7.0f));
+        }
+    }
+};
+
 void strokeGlow (juce::Graphics& g, const juce::Path& p, juce::Colour c, float width = 1.6f)
 {
     g.setColour (c.withAlpha (0.2f));
@@ -456,7 +544,43 @@ FinishLineEditor::FinishLineEditor (FinishLineProcessor& p)
         g.setFont (mono (11.0f));
         g.setColour (col::dim);
         g.drawText ("by desNotto", 248, 11, 96, 13, juce::Justification::centredLeft, false);
+
+        // keyboard plate + legend
+        {
+            const juce::Rectangle<float> plate (8.0f, 780.0f, (float) kW - 16.0f, (float) kH - 788.0f);
+            g.setColour (col::panel);
+            g.fillRoundedRectangle (plate, 5.0f);
+
+            g.setFont (font (13.0f));
+            g.setColour (col::cream);
+            g.drawText ("TRIGGER KEYS", 18, 783, 100, 20, juce::Justification::centredLeft, false);
+            g.setFont (jp (12.5f));
+            g.setColour (col::orange);
+            g.drawText (U ("鍵盤"), 110, 783, 40, 20, juce::Justification::centredLeft, false);
+
+            struct Item { juce::Colour c; const char* text; int width; };
+            const Item items[] = {
+                { col::cream, "C1  ALL LAYERS", 100 }, { col::orange, "D1  SUB", 58 }, { col::amber, "E1  IMPACT", 76 },
+                { col::teal, "F1  SYNTH (HOLD)", 112 }, { col::pink, "G1  RISER", 70 }, { col::red, "A1  TAPE STOP (HOLD)", 136 },
+                { juce::Colour (0xffcbc4b1), "C2-C6  ALL LAYERS, PITCHED  (C3 = ROOT)", 250 }, { juce::Colour (0xff3a3940), "UNUSED", 60 }
+            };
+
+            int x = 156;
+            g.setFont (font (10.5f));
+            for (const auto& it : items)
+            {
+                g.setColour (it.c);
+                g.fillRoundedRectangle ((float) x, 788.0f, 10.0f, 10.0f, 2.0f);
+                g.setColour (col::dim.brighter (0.4f));
+                g.drawText (it.text, x + 15, 783, it.width, 20, juce::Justification::centredLeft, false);
+                x += it.width + 28;
+            }
+
+            g.setColour (col::line);
+            g.drawRoundedRectangle (plate.reduced (0.5f), 5.0f, 1.0f);
+        }
         g.setFont (jp (11.5f));
+        g.setColour (col::dim);
         g.drawText (U ("FL-01 音響兵器"), 248, 24, 96, 14, juce::Justification::centredLeft, false);
     };
     content = std::move (root);
@@ -469,6 +593,7 @@ FinishLineEditor::FinishLineEditor (FinishLineProcessor& p)
     buildMaster();
     buildLayers();
     buildFx();
+    buildKeyboard();
 
     setResizable (true, true);
     setResizeLimits (kW * 3 / 4, kH * 3 / 4, kW * 2, kH * 2);
@@ -1003,6 +1128,11 @@ void FinishLineEditor::buildFx()
         make<Knob> (owned, pn, { 58, ky, 56, 60 }, proc, P::tape_time, "STOP TIME", col::cream);
         make<Toggle> (owned, pn, { 116, ky + 2, 70, 44 }, proc, P::tape_stop, "TAPE STOP", col::red);
     }
+}
+
+void FinishLineEditor::buildKeyboard()
+{
+    make<TriggerKeyboard> (owned, *content, { 12, 806, kW - 24, kH - 806 - 12 }, proc.keyState);
 }
 
 //==============================================================================

@@ -95,20 +95,21 @@ int main (int argc, char* argv[])
 
     // State round trip.
     {
-        proc.applyPreset (9);
+        const int anvil = fl::findPreset ("Anvil Strike");
+        proc.applyPreset (anvil);
         proc.setParam (fl::P::sub_start, 321.0f);
         juce::MemoryBlock state;
         proc.getStateInformation (state);
-        proc.applyPreset (20);
+        proc.applyPreset (fl::findPreset ("Reese Classic"));
         proc.setStateInformation (state.getData(), (int) state.getSize());
-        const bool ok = std::abs (proc.getParam (fl::P::sub_start) - 321.0f) < 0.5f && proc.presetIndex == 9;
+        const bool ok = std::abs (proc.getParam (fl::P::sub_start) - 321.0f) < 0.5f && anvil >= 0 && proc.presetIndex == anvil;
         if (! ok) ++failures;
         std::printf ("state round trip: %s (%d bytes)\n", ok ? "ok" : "FAIL", (int) state.getSize());
     }
 
     // Randomiser respects locks.
     {
-        proc.applyPreset (7);
+        proc.applyPreset (fl::findPreset ("Cinema Slam"));
         proc.setParam (fl::P::sub_lock, 1.0f);
         const float before = proc.getParam (fl::P::sub_start);
         const float impBefore = proc.getParam (fl::P::imp_attack);
@@ -123,7 +124,7 @@ int main (int argc, char* argv[])
 
     // WAV bounce (drag-and-drop path).
     {
-        proc.applyPreset (17);
+        proc.applyPreset (fl::findPreset ("Tension Riser - 2 Bars"));
         const auto wav = proc.renderToWav();
         juce::AudioFormatManager fm;
         fm.registerBasicFormats();

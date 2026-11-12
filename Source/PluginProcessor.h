@@ -61,6 +61,7 @@ public:
 
     //==============================================================================
     juce::AudioProcessorValueTreeState apvts;
+    juce::MidiKeyboardState keyState; // on-screen keyboard <-> MIDI stream
 
     static constexpr int kScopeSize = 4096;
     std::array<float, kScopeSize> scope {};
