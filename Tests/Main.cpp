@@ -95,7 +95,7 @@ int main (int argc, char* argv[])
 
     // State round trip.
     {
-        const int anvil = fl::findPreset ("Anvil Strike");
+        const int anvil = fl::findPreset ("Taiko Wall");
         proc.applyPreset (anvil);
         proc.setParam (fl::P::sub_start, 321.0f);
         juce::MemoryBlock state;
@@ -124,7 +124,7 @@ int main (int argc, char* argv[])
 
     // WAV bounce (drag-and-drop path).
     {
-        proc.applyPreset (fl::findPreset ("Tension Riser - 2 Bars"));
+        proc.applyPreset (fl::findPreset ("Epic Riser - 4 Bars"));
         const auto wav = proc.renderToWav();
         juce::AudioFormatManager fm;
         fm.registerBasicFormats();
